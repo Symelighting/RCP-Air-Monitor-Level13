@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<!--
+  Royal College of Physicians - Level 13 average
+  The Spine, Paddington Village.
+
+  LEGACY BUILD for the Reserva / Onelan NTB player (NTB 11.x, WebKit 531).
+  That browser is Safari 4 era, so this file avoids everything it cannot handle:
+  no fetch, no promises, no arrow functions or template literals, no Map or
+  Object.entries, no CSS variables, flexbox or grid, no inline SVG and no web
+  fonts. Requests use XMLHttpRequest with callbacks, the layout is absolute
+  positioning in pixels, and the chart is built from plain divs.
+
+  Panel size: 800 x 1280 portrait.
+
+  Note: the API client id and secret are in plain text below. Anyone who can
+  open or view-source this file can read the estate's sensor data.
+-->
+
+<html lang="en-GB">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="refresh" content="21600">
+<title>Level 13 air quality - Spaces at The Spine</title>
+<style type="text/css">
+/*
+ * Spaces at The Spine palette, taken from the venue brand:
+ *   deep teal   #005967   primary type
+ *   teal        #078894   secondary type and chart
+ *   mint        #aed5cb   panel tint
+ *   blush       #f6d3c4   panel tint
+ *   ochre       #be8c2b   watch
+ *   terracotta  #b4523a   action
+ */
+html, body {
+  margin: 0; padding: 0; width: 800px; height: 1280px;
+  background: #ffffff; color: #005967; overflow: hidden;
+  font-family: Arial, "DejaVu Sans", Helvetica, sans-serif;
+}
+#page { position: relative; width: 800px; height: 1280px; }
+
+#head { position: absolute; left: 0; top: 0; width: 800px; height: 112px; }
+/* Brand stripe, in the venue's own palette. */
+#stripe { position: absolute; left: 0; top: 112px; width: 800px; height: 6px; }
+#stripe div { position: absolute; top: 0; height: 6px; width: 200px; }
+#s1 { left: 0;   background: #005967; }
+#s2 { left: 200px; background: #078894; }
+#s3 { left: 400px; background: #aed5cb; }
+#s4 { left: 600px; background: #f6d3c4; }
+/* Logo box matches the artwork's 300 x 102 aspect ratio, so it is never stretched. */
+#logo { position: absolute; left: 30px; top: 26px; width: 265px; height: 90px; }
+#brand { position: absolute; left: 30px; top: 0; width: 0; }
+#brandTitle { display: none; }
+#brandSub { display: none; }
+#clock { position: absolute; right: 30px; top: 30px; width: 240px; text-align: right;
+         font-family: "DejaVu Sans Mono", "Courier New", monospace;
+         font-size: 34px; color: #005967; }
+#live { position: absolute; right: 30px; top: 72px; width: 300px; text-align: right;
+        font-size: 13px; color: #6c8a8f; }
+#live b { color: #078894; }
+
+#alert { position: absolute; left: 0; top: 0; width: 800px; padding: 14px 30px;
+         background: #b4523a; color: #ffffff; font-size: 15px; display: none; z-index: 20; }
+
+#roomName { position: absolute; left: 30px; top: 144px; width: 480px;
+            font-weight: bold; font-size: 62px; line-height: 64px; color: #005967;
+            letter-spacing: -1px; }
+#roomMeta { position: absolute; left: 30px; top: 220px; width: 520px;
+            font-size: 17px; color: #6c8a8f; }
+#stateWord { position: absolute; right: 30px; top: 158px; width: 380px; text-align: right;
+             font-weight: bold; font-size: 32px; }
+#stateSub { position: absolute; right: 30px; top: 200px; width: 380px; text-align: right;
+            font-size: 12px; letter-spacing: 3px; color: #6c8a8f; }
+
+#hero { position: absolute; left: 30px; top: 264px; width: 740px; height: 396px;
+        background: #eef6f4; border: 1px solid #cfe4de;
+        -webkit-border-radius: 10px; border-radius: 10px; }
+#heroLabel { position: absolute; left: 26px; top: 20px; width: 690px; font-size: 15px;
+             letter-spacing: 3px; color: #6c8a8f; }
+#heroValue { position: absolute; left: 24px; top: 44px; width: 690px;
+             font-family: "DejaVu Sans Mono", "Courier New", monospace;
+             font-size: 108px; line-height: 108px; white-space: nowrap; color: #005967; }
+#heroValue .u { font-family: Arial, "DejaVu Sans", sans-serif; font-size: 28px; color: #6c8a8f; }
+#heroStats { position: absolute; left: 26px; top: 172px; width: 690px;
+             font-family: "DejaVu Sans Mono", "Courier New", monospace;
+             font-size: 15px; color: #6c8a8f; }
+#chart { position: absolute; left: 26px; top: 204px; width: 688px; height: 170px; }
+#chart .bar { position: absolute; bottom: 0; background: #078894; }
+
+.tile { position: absolute; width: 362px; height: 164px;
+        background: #ffffff; border: 1px solid #d9e5e4;
+        -webkit-border-radius: 10px; border-radius: 10px; }
+.tileLab { position: absolute; left: 22px; top: 20px; font-size: 13px;
+           letter-spacing: 3px; color: #6c8a8f; }
+.tileVal { position: absolute; left: 22px; top: 56px;
+           font-family: "DejaVu Sans Mono", "Courier New", monospace;
+           font-size: 54px; color: #005967; }
+.tileUnit { font-family: Arial, "DejaVu Sans", sans-serif; font-size: 18px; color: #6c8a8f; }
+
+#foot { position: absolute; left: 0; top: 1216px; width: 800px; height: 64px;
+        background: #005967; }
+#footLeft { position: absolute; left: 30px; top: 22px; font-size: 14px; color: #aed5cb; }
+#footRight { position: absolute; right: 30px; top: 22px; font-size: 14px; color: #aed5cb; }
+
+.good { color: #078894; }
+.fair { color: #be8c2b; }
+.poor { color: #b4523a; }
+.dorm { color: #9aa8ab; }
+</style>
+</head>
+<body>
+<div id="page">
+  <div id="alert"></div>
+
+  <div id="head">
+    <img id="logo" alt="Spaces at The Spine" src="data:image/png;base64,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">
+    <div id="clock">--:--</div>
+    <div id="live">Connecting to Airthings</div>
+  </div>
+  <div id="stripe"><div id="s1"></div><div id="s2"></div><div id="s3"></div><div id="s4"></div></div>
+
+  <div id="roomName">Level 13</div>
+  <div id="roomMeta">Waiting for the first readings</div>
+  <div id="stateWord">&nbsp;</div>
+  <div id="stateSub">AIR QUALITY</div>
+
+  <div id="hero">
+    <div id="heroLabel">AVERAGE CO2, LAST 24 HOURS</div>
+    <div id="heroValue">&ndash;</div>
+    <div id="heroStats">reading history</div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="tile" id="tile0" style="left:30px;  top:676px;"></div>
+  <div class="tile" id="tile1" style="left:408px; top:676px;"></div>
+  <div class="tile" id="tile2" style="left:30px;  top:856px;"></div>
+  <div class="tile" id="tile3" style="left:408px; top:856px;"></div>
+  <div class="tile" id="tile4" style="left:30px;  top:1036px;"></div>
+  <div class="tile" id="tile5" style="left:408px; top:1036px;"></div>
+
+
+
+  <div id="foot">
+    <div id="footLeft">Updating every 5 minutes</div>
+    <div id="footRight">&nbsp;</div>
+  </div>
+</div>
+<script type="text/javascript">
+var CLIENT_ID     = "d5b3d738-f09c-4f89-8939-ab595b334cf0";
+var CLIENT_SECRET = "9f705a28-a3a9-4c64-b6a2-eec50f22a3db";
+var LOCATION_ID   = "b4f76c61-c100-4828-ae78-999027fbaf73";
+
+/* Fallback for players that cannot call the Airthings API directly.
+   Point this at rcp-airthings-monitor.php on your own server, for example
+   "http://spine-server/airthings/rcp-airthings-monitor.php", and this screen
+   reads from there instead. Leave blank to talk to Airthings direct. */
+var DATA_URL = "";
+
+/* Clock. LONDON_TIME ignores the player's timezone and shows London wall time,
+   including the British Summer Time changeover. CLOCK_OFFSET_MINUTES corrects a
+   player whose own clock is running wrong; leave at 0 if it uses NTP. */
+var LONDON_TIME = false;
+var CLOCK_OFFSET_MINUTES = 0;
+
+/* The headline metric shown large on every screen. Change to "co2", "humidity",
+   "voc", "pm25" or any other key in the METRICS list below. */
+var HERO_KEY = "temp";
+
+var CHART_W = 688;           /* trend chart size in pixels */
+var CHART_H = 170;
+
+var REFRESH_MS   = 300000;   /* five minutes */
+var REQUEST_MS   = 20000;    /* give up on a request after twenty seconds */
+var RELOAD_HOURS = 6;
+
+/* This screen averages every sensor on Level 13. */
+var FLOOR_LABEL = "Level 13";
+var SERIALS = ["2969003664", "2969002937", "2969002729", "2969003652", "2969003857"];
+
+var DEVICES = [
+  { s: "2969003664", n: "Flyover", f: "Level 13" },
+  { s: "2969002937", n: "Space One", f: "Level 13" },
+  { s: "2969002729", n: "Space Two", f: "Level 13" },
+  { s: "2969003652", n: "Space Three", f: "Level 13" },
+  { s: "2969003857", n: "The Axis", f: "Level 13" }
+];
+
+/* =========================================================================
+ * POLYFILLS - WebKit 531 predates most of ES5
+ * ====================================================================== */
+if (!Array.prototype.indexOf) {
+  Array.prototype.indexOf = function (item) {
+    for (var i = 0; i < this.length; i++) { if (this[i] === item) { return i; } }
+    return -1;
+  };
+}
+if (!Array.prototype.forEach) {
+  Array.prototype.forEach = function (fn) {
+    for (var i = 0; i < this.length; i++) { fn(this[i], i, this); }
+  };
+}
+if (!Object.keys) {
+  Object.keys = function (obj) {
+    var out = [], k;
+    for (k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) { out.push(k); } }
+    return out;
+  };
+}
+if (!Date.now) { Date.now = function () { return new Date().getTime(); }; }
+
+/* =========================================================================
+ * METRICS
+ * bands: lower is better. window: middle is best. up: higher is better.
+ * ====================================================================== */
+var METRICS = [
+  { k: "co2",      label: "CO2",         unit: "ppm",   dp: 0, bands: [800, 1000] },
+  { k: "temp",     label: "TEMPERATURE", unit: "&deg;C", dp: 1, window: [18, 25, 16, 27] },
+  { k: "humidity", label: "HUMIDITY",    unit: "%",     dp: 0, window: [30, 60, 25, 70] },
+  { k: "voc",      label: "VOC",         unit: "ppb",   dp: 0, bands: [250, 2000] },
+  { k: "pm25",     label: "PM2.5",       unit: "&micro;g/m&sup3;", dp: 1, bands: [10, 25] },
+  { k: "pm1",      label: "PM1",         unit: "&micro;g/m&sup3;", dp: 1, bands: [10, 25] },
+  { k: "pm10",     label: "PM10",        unit: "&micro;g/m&sup3;", dp: 1, bands: [25, 50] },
+  { k: "sla",      label: "SOUND LEVEL", unit: "dBA",   dp: 0 },
+  { k: "virusRisk", label: "VIRUS RISK", unit: "",      dp: 0, bands: [30, 60] },
+  { k: "airExchangeRate", label: "AIR EXCHANGE", unit: "ACH", dp: 2 },
+  { k: "pressure", label: "PRESSURE",    unit: "hPa",   dp: 0 },
+  { k: "light",    label: "LIGHT LEVEL", unit: "",      dp: 0 },
+  { k: "battery",  label: "BATTERY",     unit: "%",     dp: 0, up: [20, 10] }
+];
+
+function metricFor(key) {
+  for (var i = 0; i < METRICS.length; i++) { if (METRICS[i].k === key) { return METRICS[i]; } }
+  return null;
+}
+
+function statusOf(key, value) {
+  var m = metricFor(key);
+  if (!m || value === null || value === undefined) { return ""; }
+  var v = Number(value);
+  if (isNaN(v)) { return ""; }
+  if (m.bands) { return v <= m.bands[0] ? "good" : (v <= m.bands[1] ? "fair" : "poor"); }
+  if (m.window) {
+    if (v >= m.window[0] && v <= m.window[1]) { return "good"; }
+    if (v >= m.window[2] && v <= m.window[3]) { return "fair"; }
+    return "poor";
+  }
+  if (m.up) { return v >= m.up[0] ? "good" : (v >= m.up[1] ? "fair" : "poor"); }
+  return "";
+}
+
+function worstOf(data) {
+  var order = { "": 0, good: 1, fair: 2, poor: 3 };
+  var worst = "";
+  for (var i = 0; i < METRICS.length; i++) {
+    var k = METRICS[i].k;
+    if (k === "battery") { continue; }
+    var s = statusOf(k, data[k]);
+    if (order[s] > order[worst]) { worst = s; }
+  }
+  return worst;
+}
+
+function toneOf(state) {
+  return state === "poor" ? "poor" : (state === "fair" ? "fair" : (state === "good" ? "good" : "dorm"));
+}
+
+function colourOf(state) {
+  return state === "poor" ? "#ff9862" : (state === "fair" ? "#ffcc53" : "#59d8a1");
+}
+
+function wordOf(state, stale) {
+  if (stale) { return "No recent data"; }
+  return state === "poor" ? "Action" : (state === "fair" ? "Watch" : "Within guidance");
+}
+
+function fmt(value, m) {
+  if (value === null || value === undefined || value === "") { return "\u2013"; }
+  var v = Number(value);
+  if (isNaN(v)) { return "\u2013"; }
+  var dp = m ? m.dp : 1;
+  if (v.toFixed) { return v.toFixed(dp); }
+  return "" + v;
+}
+
+function ago(seconds) {
+  if (seconds === null) { return "no reading"; }
+  if (seconds < 90) { return "just now"; }
+  if (seconds < 3600) { return Math.round(seconds / 60) + " min ago"; }
+  if (seconds < 86400) { return Math.round(seconds / 3600) + " h ago"; }
+  return Math.round(seconds / 86400) + " d ago";
+}
+
+function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+/* =========================================================================
+ * LONDON TIME
+ * The player's own timezone setting is ignored. Everything is worked out from
+ * UTC, then British Summer Time is added between 01:00 UTC on the last Sunday
+ * in March and 01:00 UTC on the last Sunday in October. Set
+ * CLOCK_OFFSET_MINUTES if the player's clock itself is running wrong.
+ * ====================================================================== */
+var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+                   "July", "August", "September", "October", "November", "December"];
+
+function nowMs() { return (new Date()).getTime() + CLOCK_OFFSET_MINUTES * 60000; }
+function nowSeconds() { return Math.floor(nowMs() / 1000); }
+
+/** Date of the last Sunday in a month, month being 0 for January. */
+function lastSundayOfMonth(year, month) {
+  var lastDay = new Date(Date.UTC(year, month + 1, 0));
+  return lastDay.getUTCDate() - lastDay.getUTCDay();
+}
+
+/** Minutes to add to UTC for London: 60 during British Summer Time, otherwise 0. */
+function londonOffsetMinutes(utcMillis) {
+  var d = new Date(utcMillis);
+  var year = d.getUTCFullYear();
+  var starts = Date.UTC(year, 2, lastSundayOfMonth(year, 2), 1, 0, 0);
+  var ends = Date.UTC(year, 9, lastSundayOfMonth(year, 9), 1, 0, 0);
+  return (utcMillis >= starts && utcMillis < ends) ? 60 : 0;
+}
+
+/** London wall clock, read through the UTC getters of a shifted date. */
+function londonDate() {
+  var utc = nowMs();
+  return new Date(utc + londonOffsetMinutes(utc) * 60000);
+}
+
+function londonTimeText() {
+  var d = londonDate();
+  return pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes());
+}
+
+function londonDateText() {
+  var d = londonDate();
+  return DAY_NAMES[d.getUTCDay()] + " " + d.getUTCDate() + " " +
+    MONTH_NAMES[d.getUTCMonth()] + " " + d.getUTCFullYear();
+}
+
+/** GMT or BST, for the label beside the clock. */
+function londonZoneText() {
+  return londonOffsetMinutes(nowMs()) ? "BST" : "GMT";
+}
+function byId(id) { return document.getElementById(id); }
+
+function nameOf(serial) {
+  for (var i = 0; i < DEVICES.length; i++) {
+    if (DEVICES[i].s === serial) { return DEVICES[i].n; }
+  }
+  return serial;
+}
+
+/* =========================================================================
+ * REQUESTS - XMLHttpRequest with callbacks and our own timeout
+ * ====================================================================== */
+function request(method, url, body, auth, done) {
+  var xhr = new XMLHttpRequest();
+  var finished = false;
+
+  var timer = setTimeout(function () {
+    if (finished) { return; }
+    finished = true;
+    try { xhr.abort(); } catch (e) {}
+    done("The request timed out", null);
+  }, REQUEST_MS);
+
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4 || finished) { return; }
+    finished = true;
+    clearTimeout(timer);
+    if (xhr.status < 200 || xhr.status >= 300) {
+      done("HTTP " + (xhr.status || "0, no response") + " from " + url, null);
+      return;
+    }
+    var parsed;
+    try { parsed = eval("(" + xhr.responseText + ")"); }
+    catch (e) { done("The response was not readable JSON", null); return; }
+    done(null, parsed);
+  };
+
+  try {
+    xhr.open(method, url, true);
+    if (body) { xhr.setRequestHeader("Content-Type", "application/json"); }
+    if (auth) { xhr.setRequestHeader("Authorization", "Bearer " + auth); }
+    xhr.send(body ? body : null);
+  } catch (e) {
+    if (!finished) {
+      finished = true;
+      clearTimeout(timer);
+      done("The browser refused the request: " + e, null);
+    }
+  }
+}
+
+var token = null;
+var tokenExpires = 0;
+
+function withToken(done) {
+  if (DATA_URL) { done(null, null); return; }
+  if (token && tokenExpires > Date.now() + 60000) { done(null, token); return; }
+  var body = '{"grant_type":"client_credentials","client_id":"' + CLIENT_ID +
+    '","client_secret":"' + CLIENT_SECRET + '","scope":["read:device"]}';
+  request("POST", "https://accounts-api.airthings.com/v1/token", body, null, function (err, data) {
+    if (err) { done("Sign in failed. " + err, null); return; }
+    if (!data || !data.access_token) { done("Sign in returned no token", null); return; }
+    token = data.access_token;
+    tokenExpires = Date.now() + (data.expires_in ? data.expires_in * 1000 : 3600000);
+    done(null, token);
+  });
+}
+
+/**
+ * Current readings for every sensor this screen cares about.
+ * One request covers the whole building, either from Airthings or from the
+ * PHP endpoint when DATA_URL is set.
+ */
+function loadReadings(done) {
+  if (DATA_URL) {
+    request("GET", DATA_URL + "?api=latest", null, null, function (err, payload) {
+      if (err) { done(err, null); return; }
+      if (!payload || !payload.rooms) { done("The server sent no readings", null); return; }
+      var out = [];
+      for (var i = 0; i < payload.rooms.length; i++) {
+        var room = payload.rooms[i];
+        if (SERIALS.indexOf(room.serial) < 0) { continue; }
+        out.push({ serial: room.serial, name: nameOf(room.serial), data: room.data || {} });
+      }
+      done(null, out);
+    });
+    return;
+  }
+  withToken(function (err, tok) {
+    if (err) { done(err, null); return; }
+    request("GET", "https://ext-api.airthings.com/v1/locations/" + LOCATION_ID + "/latest-samples",
+      null, tok, function (err2, payload) {
+        if (err2) { done(err2, null); return; }
+        if (!payload || !payload.devices) { done("The API sent no devices", null); return; }
+        var out = [];
+        for (var i = 0; i < payload.devices.length; i++) {
+          var dev = payload.devices[i];
+          if (SERIALS.indexOf(dev.id) < 0) { continue; }
+          out.push({ serial: dev.id, name: nameOf(dev.id), data: dev.data || {} });
+        }
+        done(null, out);
+      });
+  });
+}
+
+/** Twenty four hours of history for one sensor. */
+function loadHistory(serial, done) {
+  if (DATA_URL) {
+    request("GET", DATA_URL + "?api=history&serial=" + serial + "&hours=24", null, null,
+      function (err, payload) {
+        if (err) { done(err, null); return; }
+        done(null, payload && payload.data ? payload.data : null);
+      });
+    return;
+  }
+  var to = nowSeconds();
+  var from = to - 86400;
+  withToken(function (err, tok) {
+    if (err) { done(err, null); return; }
+    request("GET", "https://ext-api.airthings.com/v1/devices/" + serial +
+      "/samples?start=" + from + "&end=" + to, null, tok, function (err2, payload) {
+        if (err2) { done(err2, null); return; }
+        done(null, payload && payload.data ? payload.data : null);
+      });
+  });
+}
+
+/** History for several sensors, one after another so the player is never flooded. */
+function loadHistories(serials, done) {
+  var results = [];
+  var index = 0;
+  function next() {
+    if (index >= serials.length) { done(results); return; }
+    var serial = serials[index];
+    index++;
+    loadHistory(serial, function (err, data) {
+      if (!err && data) { results.push(data); }
+      next();
+    });
+  }
+  next();
+}
+
+/* =========================================================================
+ * CHART - a row of absolutely positioned divs, so no SVG is needed
+ * ====================================================================== */
+var CHART_COLUMNS = 100;
+
+/** Reduce one or more sample series to a fixed number of averaged columns. */
+function bucket(seriesList, key) {
+  var columns = [];
+  var c;
+  for (c = 0; c < CHART_COLUMNS; c++) { columns.push({ sum: 0, count: 0 }); }
+
+  for (var s = 0; s < seriesList.length; s++) {
+    var values = seriesList[s] ? seriesList[s][key] : null;
+    if (!values || !values.length) { continue; }
+    var clean = [];
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] === null || values[i] === undefined) { continue; }
+      var v = Number(values[i]);
+      if (!isNaN(v)) { clean.push(v); }
+    }
+    if (!clean.length) { continue; }
+    var step = clean.length / CHART_COLUMNS;
+    for (c = 0; c < CHART_COLUMNS; c++) {
+      var start = Math.floor(c * step);
+      var end = Math.floor((c + 1) * step);
+      if (end <= start) { end = start + 1; }
+      for (var p = start; p < end && p < clean.length; p++) {
+        columns[c].sum += clean[p];
+        columns[c].count++;
+      }
+    }
+  }
+
+  var out = [];
+  for (c = 0; c < CHART_COLUMNS; c++) {
+    out.push(columns[c].count ? columns[c].sum / columns[c].count : null);
+  }
+  return out;
+}
+
+/** Paint bucketed values into a chart div of the given pixel size. */
+function paintBars(elementId, values, key, width, height) {
+  var box = byId(elementId);
+  if (!box) { return null; }
+  var present = [];
+  var i;
+  for (i = 0; i < values.length; i++) { if (values[i] !== null) { present.push(values[i]); } }
+  if (!present.length) { box.innerHTML = ""; return null; }
+
+  var low = present[0], high = present[0], total = 0;
+  for (i = 0; i < present.length; i++) {
+    if (present[i] < low) { low = present[i]; }
+    if (present[i] > high) { high = present[i]; }
+    total += present[i];
+  }
+  var span = high - low;
+  if (span < 1) { span = 1; }
+
+  var barWidth = Math.floor(width / values.length);
+  if (barWidth < 2) { barWidth = 2; }
+  var gap = Math.floor(width / values.length);
+  var html = "";
+  for (i = 0; i < values.length; i++) {
+    if (values[i] === null) { continue; }
+    var barHeight = Math.round(((values[i] - low) / span) * (height - 18)) + 4;
+    html += '<div class="bar" style="left:' + (i * gap) + "px;width:" + (barWidth - 2) +
+      "px;height:" + barHeight + "px;background:" + colourOf(statusOf(key, values[i])) + ';"></div>';
+  }
+  box.innerHTML = html;
+  return { low: low, high: high, average: total / present.length, count: present.length };
+}
+
+
+/* =========================================================================
+ * FLOOR AVERAGE SCREEN
+ * Averages every sensor on one level, with a per-space list underneath.
+ * ====================================================================== */
+/* HERO_KEY comes from the config block at the top of the file. Every metric
+   other than the headline one fills the tiles, in this order. */
+var TILE_ORDER = ["co2", "temp", "humidity", "voc", "pm25", "sla", "airExchangeRate"];
+
+function tileKeys() {
+  var out = [];
+  for (var i = 0; i < TILE_ORDER.length && out.length < 6; i++) {
+    if (TILE_ORDER[i] !== HERO_KEY) { out.push(TILE_ORDER[i]); }
+  }
+  return out;
+}
+var TILE_KEYS = tileKeys();
+
+var failures = 0;
+var lastReadingAt = 0;
+
+function showAlert(message) {
+  var box = byId("alert");
+  if (!message) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.innerHTML = message;
+  box.style.display = "block";
+}
+
+/** Mean of one metric across the spaces that report it. */
+function averageOf(rooms, key) {
+  var sum = 0, count = 0;
+  for (var i = 0; i < rooms.length; i++) {
+    var v = rooms[i].data ? rooms[i].data[key] : null;
+    if (v === null || v === undefined) { continue; }
+    var n = Number(v);
+    if (isNaN(n)) { continue; }
+    sum += n; count++;
+  }
+  return count ? { value: sum / count, count: count } : { value: null, count: 0 };
+}
+
+function tickClock() {
+  if (LONDON_TIME) {
+    byId("clock").innerHTML = londonTimeText();
+    if (byId("date")) {
+      byId("date").innerHTML = londonDateText() + " &middot; " + londonZoneText();
+    }
+  } else {
+    var now = new Date();
+    byId("clock").innerHTML = pad2(now.getHours()) + ":" + pad2(now.getMinutes());
+  }
+  if (lastReadingAt) {
+    byId("live").innerHTML = "Live from Airthings &middot; <b>" +
+      ago(Math.floor((nowMs() - lastReadingAt) / 1000)) + "</b>";
+  }
+}
+
+function paintRooms(rooms) {
+  var heroMetric = metricFor(HERO_KEY);
+  var hero = averageOf(rooms, HERO_KEY);
+
+  byId("heroValue").innerHTML = fmt(hero.value, heroMetric) +
+    ' <span class="u">' + heroMetric.unit + "</span>";
+  byId("heroValue").className = statusOf(HERO_KEY, hero.value);
+  byId("heroLabel").innerHTML = "AVERAGE " + heroMetric.label + ", LAST 24 HOURS";
+
+  /* Oldest reading on the floor, and how the floor is doing overall. */
+  var oldest = null, flagged = 0, quiet = 0, i;
+  var order = { "": 0, good: 1, fair: 2, poor: 3 };
+  var worst = "";
+  for (i = 0; i < rooms.length; i++) {
+    var data = rooms[i].data || {};
+    var age = data.time ? nowSeconds() - data.time : null;
+    if (age === null || age > 1200) { quiet++; }
+    if (age !== null && (oldest === null || age > oldest)) { oldest = age; }
+    var state = worstOf(data);
+    if (state === "fair" || state === "poor") { flagged++; }
+    if (order[state] > order[worst]) { worst = state; }
+  }
+
+  var stale = (quiet === rooms.length);
+  byId("stateWord").innerHTML = wordOf(worst, stale);
+  byId("stateWord").className = stale ? "dorm" : toneOf(worst);
+  byId("roomMeta").innerHTML = rooms.length + (rooms.length === 1 ? " space" : " spaces") +
+    " &middot; " + (flagged ? flagged + " needing attention" : "all within guidance") +
+    (quiet ? " &middot; " + quiet + " not reporting" : "");
+  byId("footRight").innerHTML = "Averaged from " + rooms.length +
+    (rooms.length === 1 ? " sensor" : " sensors") + " &middot; oldest reading " + ago(oldest);
+
+  /* Averages for the supporting tiles. */
+  for (i = 0; i < TILE_KEYS.length; i++) {
+    var key = TILE_KEYS[i];
+    var m = metricFor(key);
+    var avg = averageOf(rooms, key);
+    var tile = byId("tile" + i);
+    if (avg.value === null) { tile.style.display = "none"; continue; }
+    tile.innerHTML = '<div class="tileLab">' + m.label + " AVERAGE</div>" +
+      '<div class="tileVal ' + statusOf(key, avg.value) + '">' + fmt(avg.value, m) +
+      (m.unit ? ' <span class="tileUnit">' + m.unit + "</span>" : "") + "</div>";
+    tile.style.display = "block";
+  }
+
+}
+
+function paintAverageChart(histories) {
+  var stats = paintBars("chart", bucket(histories, HERO_KEY), HERO_KEY, CHART_W, CHART_H);
+  var m = metricFor(HERO_KEY);
+  if (!stats) { byId("heroStats").innerHTML = "History unavailable"; return; }
+  byId("heroStats").innerHTML = "low " + fmt(stats.low, m) + "&nbsp;&nbsp;high " + fmt(stats.high, m) +
+    "&nbsp;&nbsp;average " + fmt(stats.average, m) + "&nbsp;&nbsp;from " + histories.length +
+    (histories.length === 1 ? " sensor" : " sensors");
+}
+
+/** Put the spaces in the order they are listed in DEVICES, so the list is stable. */
+function inDeviceOrder(list) {
+  var out = [];
+  for (var d = 0; d < DEVICES.length; d++) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].serial === DEVICES[d].s) { out.push(list[i]); }
+    }
+  }
+  return out;
+}
+
+function refresh() {
+  loadReadings(function (err, incoming) {
+    if (err || !incoming || !incoming.length) {
+      failures++;
+      var wait = Math.min(120, 15 * failures);
+      showAlert("No data from Airthings: " + (err || "no sensors returned for this floor") +
+        ". Retrying in " + wait + " seconds.");
+      setTimeout(refresh, wait * 1000);
+      return;
+    }
+    failures = 0;
+    showAlert("");
+    lastReadingAt = nowMs();
+    var rooms = inDeviceOrder(incoming);
+    paintRooms(rooms);
+
+    var serials = [];
+    for (var i = 0; i < rooms.length; i++) { serials.push(rooms[i].serial); }
+    loadHistories(serials, function (histories) {
+      if (histories.length) { paintAverageChart(histories); }
+      else { byId("heroStats").innerHTML = "History unavailable"; }
+      setTimeout(refresh, REFRESH_MS);
+    });
+  });
+}
+
+tickClock();
+setInterval(tickClock, 1000);
+refresh();
+
+/* A screen left running for weeks benefits from an occasional clean start.
+   The meta refresh in the head does the same job if scripting is interrupted. */
+setTimeout(function () { window.location.reload(true); }, RELOAD_HOURS * 3600000);
+
+</script>
+</body>
+</html>
